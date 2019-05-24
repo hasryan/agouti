@@ -26,11 +26,21 @@ func (c *Client) Send(method, endpoint string, body interface{}, result interfac
 		return err
 	}
 
+	bodyValue := struct {
+		Status *int        `json:"status"`
+		Value  interface{} `json:"value"`
+	}{}
 	if result != nil {
-		bodyValue := struct{ Value interface{} }{result}
-		if err := json.Unmarshal(responseBody, &bodyValue); err != nil {
-			return fmt.Errorf("unexpected response: %s", responseBody)
-		}
+		bodyValue.Value = result
+	}
+
+	// See https://github.com/sclevine/agouti issue #186
+	if err := json.Unmarshal(responseBody, &bodyValue); err != nil {
+		return fmt.Errorf("unexpected response: %s", responseBody)
+	} else if bodyValue.Status == nil {
+		return fmt.Errorf("unexpected response (missing 'status' response property): %s", responseBody)
+	} else if *bodyValue.Status != 0 {
+		return fmt.Errorf("unexpected response (nonzero status %d): %s", *bodyValue.Status, responseBody)
 	}
 
 	return nil
